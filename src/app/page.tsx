@@ -1,103 +1,198 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useRef, useEffect } from "react";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [scale, setScale] = useState(100);
+  const [scenePosition, setScenePosition] = useState({ x: 0, y: 0 });
+  const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
+  const [isSceneDragging, setIsSceneDragging] = useState(false);
+  const [isCardDragging, setIsCardDragging] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY;
+    setScale(prevScale => {
+      const newScale = delta > 0 
+        ? Math.max(10, prevScale - 5) 
+        : Math.min(300, prevScale + 5);
+      return newScale;
+    });
+  };
+
+  const adjustScale = (amount: number) => {
+    setScale(prevScale => {
+      const newScale = Math.max(10, Math.min(300, prevScale + amount));
+      return newScale;
+    });
+  };
+
+  // Scene dragging - with middle mouse button
+  const handleSceneMouseDown = (e: React.MouseEvent) => {
+    // Only start dragging if middle mouse button (button 1) is pressed
+    if (e.button !== 1) return;
+    
+    setIsSceneDragging(true);
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+    
+    // Change cursor style during drag
+    if (containerRef.current) {
+      containerRef.current.style.cursor = 'grabbing';
+    }
+    
+    // Prevent default behavior
+    e.preventDefault();
+  };
+
+  // Card dragging - with left mouse button
+  const handleCardMouseDown = (e: React.MouseEvent) => {
+    // Only start dragging if left mouse button (button 0) is pressed
+    if (e.button !== 0) return;
+    
+    setIsCardDragging(true);
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+    
+    if (cardRef.current) {
+      cardRef.current.style.cursor = 'grabbing';
+    }
+    
+    // Prevent event from bubbling to prevent scene dragging
+    e.stopPropagation();
+    // Prevent default behavior
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Calculate the mouse movement delta since last position
+    const deltaX = e.clientX - lastMousePos.x;
+    const deltaY = e.clientY - lastMousePos.y;
+    
+    // Update the last mouse position for next calculation
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+    
+    // Update scene position if scene is being dragged
+    if (isSceneDragging) {
+      setScenePosition(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+    }
+    
+    // Update card position if card is being dragged
+    if (isCardDragging) {
+      setCardPosition(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+    }
+  };
+
+  const handleMouseUp = () => {
+    // Reset scene dragging
+    if (isSceneDragging) {
+      setIsSceneDragging(false);
+      if (containerRef.current) {
+        containerRef.current.style.cursor = 'auto';
+      }
+    }
+    
+    // Reset card dragging
+    if (isCardDragging) {
+      setIsCardDragging(false);
+      if (cardRef.current) {
+        cardRef.current.style.cursor = 'grab';
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Add mouse up event listener to window to ensure dragging stops
+    // even if the mouse button is released outside the component
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Add this effect to initialize the cursor style
+  useEffect(() => {
+    if (cardRef.current) {
+      cardRef.current.style.cursor = 'grab';
+    }
+  }, []);
+
+  return (
+    <div className="relative w-full h-screen overflow-hidden bg-secondary">
+      {/* Scene container */}
+      <div 
+        ref={containerRef}
+        className="w-full h-full"
+        onWheel={handleWheel}
+        onMouseDown={handleSceneMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
+        {/* Scene content */}
+        <div 
+          className="absolute top-1/2 left-1/2 w-full h-full transition-none"
+          style={{ 
+            transform: `translate(calc(-50% + ${scenePosition.x}px), calc(-50% + ${scenePosition.y}px))` 
+          }}
+        >
+          {/* Dot pattern background */}
+          <div 
+            className="absolute top-0 left-0 w-[6000px] h-[6000px]"
+            style={{
+              backgroundImage: 'radial-gradient(circle, rgba(100,100,100,0.3) 1px, transparent 1px)',
+              backgroundSize: `${25 * scale / 100}px ${25 * scale / 100}px`,
+              backgroundPosition: 'center center',
+              transform: `translate(-50%, -50%) scale(${scale / 100})`,
+              transformOrigin: 'center',
+            }}
+          />
+
+          {/* Example content */}
+          <div 
+            ref={cardRef}
+            className="absolute top-1/2 left-1/2 w-[600px] h-[400px] bg-white rounded-md shadow-lg"
+            style={{
+              transform: `translate(calc(-50% + ${cardPosition.x}px), calc(-50% + ${cardPosition.y}px)) scale(${scale / 100})`,
+              transformOrigin: 'center',
+            }}
+            onMouseDown={handleCardMouseDown}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <div className="w-full h-full p-4 flex flex-col items-center justify-center">
+              <div className="text-2xl font-bold text-primary">Zoomable Scene</div>
+              <div className="mt-4 text-muted-foreground">Use mouse scroll to zoom in/out</div>
+              <div className="mt-2 text-muted-foreground">Middle click and drag to move scene</div>
+              <div className="mt-2 text-muted-foreground">Left click and drag this card to move it</div>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      </div>
+
+      {/* Zoom controls */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-popover rounded-md p-2 shadow-md z-10">
+        <button 
+          onClick={() => adjustScale(-10)} 
+          className="w-8 h-8 flex items-center justify-center bg-secondary rounded-md hover:bg-secondary/80"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          -
+        </button>
+        <div className="min-w-[60px] text-center font-mono">
+          {scale}%
+        </div>
+        <button 
+          onClick={() => adjustScale(10)} 
+          className="w-8 h-8 flex items-center justify-center bg-secondary rounded-md hover:bg-secondary/80"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          +
+        </button>
+      </div>
     </div>
   );
 }
