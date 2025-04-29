@@ -198,6 +198,22 @@ html, body, #root, .app {
   filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
 }
 
+/* Düz çizgi stilleri */
+.connection-path {
+  /* Çizgiler için daha net görünüm */
+  shape-rendering: geometricPrecision;
+}
+
+/* Düz çizgiler için geçiş animasyonu */
+/* .connection-path, .connection-preview {
+  transition: all 0.2s ease;
+} */
+
+/* Kontrol noktaları arasındaki geçişler */
+/* circle {
+  transition: r 0.2s, fill 0.2s, opacity 0.2s;
+} */
+
 /* Tooltip Styles */
 .tooltip {
   position: absolute;

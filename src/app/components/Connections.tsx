@@ -195,26 +195,17 @@ const Connections: React.FC = () => {
     };
   };
 
-  // Calculate path with control points
+  // Calculate path with control points - now using straight lines
   const calculatePath = (
     sourceX: number, sourceY: number, 
     targetX: number, targetY: number, 
     controlPoints: any[]
   ) => {
     if (controlPoints.length === 0) {
-      // Simple curved path with no control points
-      const dx = Math.abs(targetX - sourceX) * 0.5;
-      const dy = Math.abs(targetY - sourceY) * 0.5;
-      
-      // Default control points for a simple curve
-      const sourceCx = sourceX + dx;
-      const sourceCy = sourceY;
-      const targetCx = targetX - dx;
-      const targetCy = targetY;
-      
-      return `M ${sourceX} ${sourceY} C ${sourceCx} ${sourceCy}, ${targetCx} ${targetCy}, ${targetX} ${targetY}`;
+      // Simple straight line with no control points
+      return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
     } else {
-      // Complex path with control points
+      // Complex path with straight lines through control points
       // Start with the source point
       let path = `M ${sourceX} ${sourceY}`;
       
@@ -225,20 +216,13 @@ const Connections: React.FC = () => {
         return distA - distB;
       });
       
-      // Add each control point as a quadratic curve point
-      if (sortedPoints.length === 1) {
-        // Only one control point - use a quadratic curve
-        path += ` Q ${sortedPoints[0].position.x} ${sortedPoints[0].position.y}, ${targetX} ${targetY}`;
-      } else {
-        // Multiple control points - create a path through all points
-        path += ` C ${sortedPoints[0].position.x} ${sortedPoints[0].position.y}`;
-        
-        for (let i = 1; i < sortedPoints.length; i++) {
-          path += `, ${sortedPoints[i].position.x} ${sortedPoints[i].position.y}`;
-        }
-        
-        path += `, ${targetX} ${targetY}`;
+      // Add straight line to each control point
+      for (const point of sortedPoints) {
+        path += ` L ${point.position.x} ${point.position.y}`;
       }
+      
+      // Finally add straight line to target
+      path += ` L ${targetX} ${targetY}`;
       
       return path;
     }
@@ -270,11 +254,25 @@ const Connections: React.FC = () => {
             strokeWidth={isSelected ? 3 : 2}
             fill="none"
             strokeLinecap="round"
+            strokeLinejoin="round"
             className="cursor-pointer connection-path"
             onClick={(e) => handleConnectionClick(e, connection.id)}
             onDoubleClick={(e) => handleConnectionDoubleClick(e, connection.id)}
             strokeDasharray={isSelected ? "" : ""}
           />
+          
+          {/* Kontrol noktalarına bağlantı yerleri vurgulaması */}
+          {connection.controlPoints.map((cp) => (
+            <circle
+              key={`dot-${cp.id}`}
+              cx={cp.position.x}
+              cy={cp.position.y}
+              r={3}
+              fill={isSelected ? "#f59e0b" : "#3b82f6"}
+              opacity={0.7}
+              pointerEvents="none"
+            />
+          ))}
           
           {/* Render control points if connection is selected */}
           {isSelected && connection.controlPoints.map((cp) => (
@@ -312,32 +310,8 @@ const Connections: React.FC = () => {
     const targetX = cursorPos.x;
     const targetY = cursorPos.y;
     
-    // Calculate control points for the curve
-    const dx = Math.abs(targetX - sourceX) * 0.5;
-    const dy = Math.abs(targetY - sourceY) * 0.5;
-    
-    let sourceCx: number, sourceCy: number;
-    
-    // Adjust source control point based on which side the connection starts from
-    switch (previewConnection.sourceSide) {
-      case 'top': 
-        sourceCx = sourceX; sourceCy = sourceY - dy; 
-        break;
-      case 'right': 
-        sourceCx = sourceX + dx; sourceCy = sourceY; 
-        break;
-      case 'bottom': 
-        sourceCx = sourceX; sourceCy = sourceY + dy; 
-        break;
-      case 'left': 
-        sourceCx = sourceX - dx; sourceCy = sourceY; 
-        break;
-      default:
-        sourceCx = sourceX + dx;
-        sourceCy = sourceY;
-    }
-    
-    const path = `M ${sourceX} ${sourceY} C ${sourceCx} ${sourceCy}, ${targetX} ${targetY}, ${targetX} ${targetY}`;
+    // Düz çizgi kullan (eğrili yerine)
+    const path = `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
     
     return (
       <>
@@ -348,6 +322,7 @@ const Connections: React.FC = () => {
           fill="none"
           strokeDasharray="5,5"
           strokeLinecap="round"
+          strokeLinejoin="round"
           className="connection-preview"
         />
         
