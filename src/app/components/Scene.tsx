@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useDrag } from '../hooks/useDrag';
 import { useZoom } from '../hooks/useZoom';
 import { SceneProvider } from '../hooks/SceneContext';
+import { ConnectionProvider } from '../hooks/ConnectionContext';
 import DotBackground from './DotBackground';
 import ZoomControls from './ZoomControls';
+import Connections from './Connections';
 
 interface SceneProps {
   children?: React.ReactNode;
@@ -14,6 +16,7 @@ interface SceneProps {
 export const Scene: React.FC<SceneProps> = ({ children }) => {
   // Initialize zoom functionality
   const { scale, handleWheel, adjustScale } = useZoom();
+  const sceneRef = useRef<HTMLDivElement>(null);
   
   // Initialize scene dragging (with middle mouse button)
   const { position, elementRef, handlers } = useDrag<HTMLDivElement>({
@@ -28,46 +31,77 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
     if (e.button === 1) {
       handlers.onMouseDown(e);
     }
+    
+    // Prevent text selection
+    e.preventDefault();
   };
 
   const handleSceneMouseMove = (e: React.MouseEvent) => {
     handlers.onMouseMove(e);
   };
 
+  // Use effect to add selectstart event listener
+  useEffect(() => {
+    const sceneElement = sceneRef.current;
+    
+    const handleSelectStart = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
+
+    if (sceneElement) {
+      sceneElement.addEventListener('selectstart', handleSelectStart);
+    }
+
+    return () => {
+      if (sceneElement) {
+        sceneElement.removeEventListener('selectstart', handleSelectStart);
+      }
+    };
+  }, []);
+
   return (
     <SceneProvider scale={scale}>
-      <div className="relative w-full h-screen overflow-hidden bg-secondary">
-        {/* Scene container */}
+      <ConnectionProvider>
         <div 
-          ref={elementRef}
-          className="w-full h-full"
-          onWheel={handleWheel}
-          onMouseDown={handleSceneMouseDown}
-          onMouseMove={handleSceneMouseMove}
-          onMouseUp={handlers.onMouseUp}
+          ref={sceneRef}
+          className="relative w-full h-screen overflow-hidden bg-secondary select-none" 
         >
-          {/* Scene content */}
+          {/* Scene container */}
           <div 
-            className="absolute top-1/2 left-1/2 w-full h-full transition-none"
-            style={{ 
-              transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))` 
-            }}
+            ref={elementRef}
+            className="w-full h-full select-none"
+            onWheel={handleWheel}
+            onMouseDown={handleSceneMouseDown}
+            onMouseMove={handleSceneMouseMove}
+            onMouseUp={handlers.onMouseUp}
           >
-            {/* Dot pattern background */}
-            <DotBackground scale={scale} />
-            
-            {/* Scene children (draggable elements) */}
-            {children}
+            {/* Scene content */}
+            <div 
+              className="absolute top-1/2 left-1/2 w-full h-full transition-none select-none"
+              style={{ 
+                transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
+              }}
+            >
+              {/* Dot pattern background */}
+              <DotBackground scale={scale} />
+              
+              {/* Connections between cards */}
+              <Connections />
+              
+              {/* Scene children (draggable elements) */}
+              {children}
+            </div>
           </div>
-        </div>
 
-        {/* Zoom controls */}
-        <ZoomControls 
-          scale={scale}
-          onZoomIn={() => adjustScale(10)}
-          onZoomOut={() => adjustScale(-10)}
-        />
-      </div>
+          {/* Zoom controls */}
+          <ZoomControls 
+            scale={scale}
+            onZoomIn={() => adjustScale(10)}
+            onZoomOut={() => adjustScale(-10)}
+          />
+        </div>
+      </ConnectionProvider>
     </SceneProvider>
   );
 };

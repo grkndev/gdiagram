@@ -27,6 +27,13 @@ export const useDrag = <T extends HTMLElement>({
     // Only activate if the specified mouse button is pressed
     if (e.button !== buttonIndex) return;
     
+    // Check if the click is on connection-node
+    if ((e.target as HTMLElement).closest('.connection-node') || 
+        (e.target as HTMLElement).closest('.connection-path') || 
+        (e.target as HTMLElement).closest('.connection-preview')) {
+      return;
+    }
+    
     setIsDragging(true);
     setLastMousePos({ x: e.clientX, y: e.clientY });
     
@@ -67,7 +74,7 @@ export const useDrag = <T extends HTMLElement>({
     e.stopPropagation();
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: React.MouseEvent) => {
     if (!isDragging) return;
     
     setIsDragging(false);
@@ -75,6 +82,11 @@ export const useDrag = <T extends HTMLElement>({
     // Reset cursor
     if (elementRef.current) {
       elementRef.current.style.cursor = cursorNormal;
+    }
+    
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
     }
   };
 
