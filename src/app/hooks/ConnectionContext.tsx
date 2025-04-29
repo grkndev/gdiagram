@@ -10,11 +10,24 @@ export interface ConnectionPoint {
   nodeId: string;
 }
 
+// Manyetik yapışma için referans noktası
+export interface MagneticTarget {
+  nodeId: string;
+  cardId: string;
+  position: { x: number; y: number };
+}
+
+export interface ControlPoint {
+  id: string;
+  position: { x: number; y: number };
+}
+
 export interface Connection {
   id: string;
   source: ConnectionPoint;
   target: ConnectionPoint;
   isSelected?: boolean;
+  controlPoints: ControlPoint[]; // Array of control points for each connection
 }
 
 export interface PreviewConnection {
@@ -23,6 +36,7 @@ export interface PreviewConnection {
   sourceSide: 'top' | 'right' | 'bottom' | 'left';
   sourceNodeId: string;
   cursorPosition: { x: number; y: number };
+  magneticTarget?: MagneticTarget; // Manyetik hedef noktası
   isReconnecting?: boolean;
   originalConnectionId?: string;
 }
@@ -31,6 +45,8 @@ interface ConnectionContextType {
   connections: Connection[];
   previewConnection: PreviewConnection | null;
   selectedConnectionId: string | null;
+  draggingControlPointId: string | null;
+  allConnectionPoints: ConnectionPoint[]; // Tüm bağlantı noktaları
   startConnection: (
     cardId: string, 
     position: { x: number; y: number }, 
@@ -61,6 +77,23 @@ interface ConnectionContextType {
     newSourceNodeId: string
   ) => void;
   hasOutgoingConnection: (nodeId: string) => boolean;
+  addControlPoint: (
+    connectionId: string,
+    position: { x: number; y: number }
+  ) => void;
+  updateControlPoint: (
+    connectionId: string,
+    controlPointId: string,
+    position: { x: number; y: number }
+  ) => void;
+  removeControlPoint: (
+    connectionId: string,
+    controlPointId: string
+  ) => void;
+  startDraggingControlPoint: (controlPointId: string) => void;
+  endDraggingControlPoint: () => void;
+  registerConnectionPoint: (point: ConnectionPoint) => void; // Bağlantı noktası kayıt fonksiyonu
+  unregisterConnectionPoint: (nodeId: string) => void; // Bağlantı noktası kaydını silen fonksiyon
 }
 
 // Create context
@@ -71,11 +104,101 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [connections, setConnections] = useState<Connection[]>([]);
   const [previewConnection, setPreviewConnection] = useState<PreviewConnection | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const [draggingControlPointId, setDraggingControlPointId] = useState<string | null>(null);
+  const [allConnectionPoints, setAllConnectionPoints] = useState<ConnectionPoint[]>([]);
+
+  // Manyetik yapışma mesafesi (piksel)
+  const MAGNETIC_THRESHOLD = 50;
 
   // Check if a node already has an outgoing connection
   const hasOutgoingConnection = useCallback((nodeId: string) => {
     return connections.some(connection => connection.source.nodeId === nodeId);
   }, [connections]);
+
+  // Bağlantı noktalarını kaydetme
+  const registerConnectionPoint = useCallback((point: ConnectionPoint) => {
+    setAllConnectionPoints(prev => {
+      // Eğer bu node ID'si zaten varsa, güncelle
+      const exists = prev.some(p => p.nodeId === point.nodeId);
+      if (exists) {
+        return prev.map(p => p.nodeId === point.nodeId ? point : p);
+      }
+      // Yoksa ekle
+      return [...prev, point];
+    });
+  }, []);
+
+  // Bağlantı noktasını kaldırma
+  const unregisterConnectionPoint = useCallback((nodeId: string) => {
+    setAllConnectionPoints(prev => prev.filter(p => p.nodeId !== nodeId));
+  }, []);
+
+  // En yakın bağlantı noktasını bulma
+  const findClosestConnectionPoint = useCallback((
+    cursorPosition: { x: number; y: number },
+    sourceCardId: string,
+    sourceNodeId: string
+  ): MagneticTarget | undefined => {
+    // İlk olarak kendi card'ımızdaki ve kendi node'umuzdaki noktaları hariç tut
+    const validPoints = allConnectionPoints.filter(point => 
+      !(point.cardId === sourceCardId && point.nodeId === sourceNodeId)
+    );
+    
+    if (validPoints.length === 0) return undefined;
+    
+    // En yakın noktayı bul
+    let closestPoint = validPoints[0];
+    let closestDistance = Math.hypot(
+      cursorPosition.x - closestPoint.position.x,
+      cursorPosition.y - closestPoint.position.y
+    );
+    
+    validPoints.forEach(point => {
+      const distance = Math.hypot(
+        cursorPosition.x - point.position.x, 
+        cursorPosition.y - point.position.y
+      );
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestPoint = point;
+      }
+    });
+    
+    // Eğer mesafe eşik değerinden küçükse, bu noktayı döndür
+    if (closestDistance <= MAGNETIC_THRESHOLD) {
+      return {
+        nodeId: closestPoint.nodeId,
+        cardId: closestPoint.cardId,
+        position: closestPoint.position
+      };
+    }
+    
+    return undefined;
+  }, [allConnectionPoints]);
+
+  // Reconnecting connection işlevi önce tanımlanmalı
+  const startReconnectingConnection = useCallback((
+    connectionId: string,
+    newSourceCardId: string,
+    newSourcePosition: { x: number; y: number },
+    newSourceSide: 'top' | 'right' | 'bottom' | 'left',
+    newSourceNodeId: string
+  ) => {
+    // Remove the old connection
+    setConnections(prev => prev.filter(conn => conn.id !== connectionId));
+    
+    // Start a new preview connection
+    setPreviewConnection({
+      sourceCardId: newSourceCardId,
+      sourcePosition: newSourcePosition,
+      sourceSide: newSourceSide,
+      sourceNodeId: newSourceNodeId,
+      cursorPosition: newSourcePosition,
+      isReconnecting: true,
+      originalConnectionId: connectionId
+    });
+  }, []);
 
   const startConnection = useCallback((
     cardId: string, 
@@ -106,38 +229,25 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       sourceNodeId: nodeId,
       cursorPosition: position,
     });
-  }, [connections, hasOutgoingConnection]);
-
-  const startReconnectingConnection = useCallback((
-    connectionId: string,
-    newSourceCardId: string,
-    newSourcePosition: { x: number; y: number },
-    newSourceSide: 'top' | 'right' | 'bottom' | 'left',
-    newSourceNodeId: string
-  ) => {
-    // Remove the old connection
-    setConnections(prev => prev.filter(conn => conn.id !== connectionId));
-    
-    // Start a new preview connection
-    setPreviewConnection({
-      sourceCardId: newSourceCardId,
-      sourcePosition: newSourcePosition,
-      sourceSide: newSourceSide,
-      sourceNodeId: newSourceNodeId,
-      cursorPosition: newSourcePosition,
-      isReconnecting: true,
-      originalConnectionId: connectionId
-    });
-  }, []);
+  }, [connections, hasOutgoingConnection, startReconnectingConnection]);
 
   const movePreviewConnection = useCallback((cursorPosition: { x: number; y: number }) => {
     if (previewConnection) {
+      // Manyetik yapışmayı kontrol et
+      const magneticTarget = findClosestConnectionPoint(
+        cursorPosition, 
+        previewConnection.sourceCardId,
+        previewConnection.sourceNodeId
+      );
+      
+      // Eğer manyetik hedef varsa, cursor pozisyonunu onun pozisyonu olarak ayarla
       setPreviewConnection({
         ...previewConnection,
-        cursorPosition,
+        cursorPosition: magneticTarget ? magneticTarget.position : cursorPosition,
+        magneticTarget
       });
     }
-  }, [previewConnection]);
+  }, [previewConnection, findClosestConnectionPoint]);
 
   const endConnection = useCallback((
     targetCardId: string,
@@ -168,10 +278,15 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         position: targetPosition,
         side: targetSide,
         nodeId: targetNodeId
-      }
+      },
+      controlPoints: [] // Initialize with no control points
     };
-
-    setConnections(prev => [...prev, newConnection]);
+    
+    setConnections(prev => {
+      const updated = [...prev, newConnection];
+      return updated;
+    });
+    
     setPreviewConnection(null);
     return true;
   }, [previewConnection]);
@@ -187,7 +302,7 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [selectedConnectionId]);
 
-  // New function to update connection node positions when cards move
+  // Update connection node positions when cards move
   const updateConnectionNodePosition = useCallback((
     cardId: string,
     nodeId: string,
@@ -239,11 +354,88 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   }, []);
 
+  // Add a control point to a connection
+  const addControlPoint = useCallback((
+    connectionId: string, 
+    position: { x: number; y: number }
+  ) => {
+    setConnections(prev => 
+      prev.map(connection => {
+        if (connection.id === connectionId) {
+          const newControlPointId = `control-${connectionId}-${Date.now()}`;
+          const newControlPoint: ControlPoint = {
+            id: newControlPointId,
+            position
+          };
+          
+          return {
+            ...connection,
+            controlPoints: [...connection.controlPoints, newControlPoint]
+          };
+        }
+        return connection;
+      })
+    );
+  }, []);
+
+  // Update a control point position
+  const updateControlPoint = useCallback((
+    connectionId: string,
+    controlPointId: string,
+    position: { x: number; y: number }
+  ) => {
+    setConnections(prev => 
+      prev.map(connection => {
+        if (connection.id === connectionId) {
+          return {
+            ...connection,
+            controlPoints: connection.controlPoints.map(cp => 
+              cp.id === controlPointId 
+                ? { ...cp, position }
+                : cp
+            )
+          };
+        }
+        return connection;
+      })
+    );
+  }, []);
+
+  // Remove a control point
+  const removeControlPoint = useCallback((
+    connectionId: string,
+    controlPointId: string
+  ) => {
+    setConnections(prev => 
+      prev.map(connection => {
+        if (connection.id === connectionId) {
+          return {
+            ...connection,
+            controlPoints: connection.controlPoints.filter(cp => cp.id !== controlPointId)
+          };
+        }
+        return connection;
+      })
+    );
+  }, []);
+
+  // Start dragging a control point
+  const startDraggingControlPoint = useCallback((controlPointId: string) => {
+    setDraggingControlPointId(controlPointId);
+  }, []);
+
+  // End dragging a control point
+  const endDraggingControlPoint = useCallback(() => {
+    setDraggingControlPointId(null);
+  }, []);
+
   return (
     <ConnectionContext.Provider value={{
       connections,
       previewConnection,
       selectedConnectionId,
+      draggingControlPointId,
+      allConnectionPoints, // Yeni eklenen tüm bağlantı noktaları
       startConnection,
       movePreviewConnection,
       endConnection,
@@ -252,7 +444,14 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       updateConnectionNodePosition,
       selectConnection,
       startReconnectingConnection,
-      hasOutgoingConnection
+      hasOutgoingConnection,
+      addControlPoint,
+      updateControlPoint,
+      removeControlPoint,
+      startDraggingControlPoint,
+      endDraggingControlPoint,
+      registerConnectionPoint, // Yeni eklenen bağlantı noktası kaydı fonksiyonu
+      unregisterConnectionPoint, // Yeni eklenen bağlantı noktası kaydını silme fonksiyonu
     }}>
       {children}
     </ConnectionContext.Provider>

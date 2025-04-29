@@ -23,7 +23,7 @@ export const DraggableCard: React.FC<DraggableCardProps> = ({
 }) => {
   // Get scale from context
   const { scale } = useSceneContext();
-  const { movePreviewConnection, previewConnection, cancelConnection, selectConnection } = useConnectionContext();
+  const { movePreviewConnection, previewConnection, cancelConnection, selectConnection, endConnection, allConnectionPoints } = useConnectionContext();
   const cardRef = useRef<HTMLDivElement>(null);
   
   const { position, elementRef, handlers } = useDrag<HTMLDivElement>({
@@ -40,9 +40,35 @@ export const DraggableCard: React.FC<DraggableCardProps> = ({
       }
     };
 
-    const handleGlobalMouseUp = () => {
+    const handleGlobalMouseUp = (e: MouseEvent) => {
       if (previewConnection) {
-        cancelConnection();
+        // Manyetik hedef varsa ona bağla
+        if (previewConnection.magneticTarget) {
+          const targetNode = allConnectionPoints.find(
+            p => p.nodeId === previewConnection.magneticTarget?.nodeId
+          );
+          
+          if (targetNode) {
+            // Manyetik hedef noktasına bağlantıyı sonlandır
+            endConnection(
+              targetNode.cardId,
+              targetNode.position,
+              targetNode.side,
+              targetNode.nodeId
+            );
+            return;
+          }
+        }
+        
+        // Manyetik hedef yoksa normal davranış
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        const isConnectionNode = element?.closest('.connection-node');
+        
+        if (!isConnectionNode) {
+          cancelConnection();
+        } else {
+          // The node's handleMouseUp will handle this
+        }
       }
     };
 
@@ -53,7 +79,7 @@ export const DraggableCard: React.FC<DraggableCardProps> = ({
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [previewConnection, movePreviewConnection, cancelConnection]);
+  }, [previewConnection, movePreviewConnection, cancelConnection, allConnectionPoints, endConnection]);
 
   // Define connection nodes
   const connectionNodes = [
@@ -118,6 +144,8 @@ export const DraggableCard: React.FC<DraggableCardProps> = ({
         height: `${height}px`,
         transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px)) scale(${scale / 100})`,
         transformOrigin: 'center',
+        zIndex: 10,
+        position: 'relative',
       }}
       onMouseDown={handleMouseDown}
       onMouseMove={handlers.onMouseMove}

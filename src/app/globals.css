@@ -149,3 +149,75 @@ html, body, #root, .app {
 .pulse-animation {
   animation: pulse 1.5s infinite;
 }
+
+/* Manyetik çekim animasyonu */
+@keyframes magnetic-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  
+  50% {
+    transform: scale(1.5);
+    opacity: 0.3;
+  }
+  
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+}
+
+.magnetic-target {
+  animation: magnetic-pulse 1s infinite;
+  filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.7));
+}
+
+/* Control Point Animations and Styles */
+.control-point circle {
+  transition: r 0.2s, fill 0.2s, stroke-width 0.2s, filter 0.3s;
+  cursor: move;
+  filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.control-point circle:hover {
+  r: 8;
+  fill: #fb923c;
+  stroke-width: 2;
+  filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.3));
+}
+
+/* Connection Path Animations */
+.connection-path {
+  transition: stroke-width 0.2s, stroke 0.2s;
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.connection-path:hover {
+  stroke-width: 3;
+  filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Tooltip Styles */
+.tooltip {
+  position: absolute;
+  background-color: rgba(15, 23, 42, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1000;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Connection Preview Animation */
+.connection-preview {
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 20;
+  }
+}

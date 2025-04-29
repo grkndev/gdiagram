@@ -30,7 +30,9 @@ const ConnectionNode: React.FC<ConnectionNodeProps> = ({
     endConnection, 
     previewConnection,
     updateConnectionNodePosition,
-    hasOutgoingConnection
+    hasOutgoingConnection,
+    registerConnectionPoint,
+    unregisterConnectionPoint
   } = useConnectionContext();
 
   // Check if this node already has an outgoing connection
@@ -57,7 +59,15 @@ const ConnectionNode: React.FC<ConnectionNodeProps> = ({
     
     setNodePosition(newPosition);
     updateConnectionNodePosition(cardId, nodeId, newPosition, side);
-  }, [cardId, nodeId, side, updateConnectionNodePosition]);
+    
+    // Bağlantı noktasını kaydet
+    registerConnectionPoint({
+      cardId,
+      nodeId,
+      position: newPosition,
+      side
+    });
+  }, [cardId, nodeId, side, updateConnectionNodePosition, registerConnectionPoint]);
 
   // Calculate node position relative to the card and update when card moves
   useEffect(() => {
@@ -82,13 +92,17 @@ const ConnectionNode: React.FC<ConnectionNodeProps> = ({
         attributeFilter: ['style', 'class', 'transform'],
         subtree: false
       });
+    } else {
+      console.error(`Cannot find parent element for node ${nodeId}`);
     }
     
     // Register for scroll events too
     window.addEventListener('scroll', calculateNodePosition);
     
     // Setup an interval to periodically update positions as a fallback
-    const intervalId = setInterval(calculateNodePosition, 500);
+    const intervalId = setInterval(() => {
+      calculateNodePosition();
+    }, 500);
     
     // Cleanup observers and event listeners
     return () => {
@@ -96,8 +110,11 @@ const ConnectionNode: React.FC<ConnectionNodeProps> = ({
       mutationObserver.disconnect();
       window.removeEventListener('scroll', calculateNodePosition);
       clearInterval(intervalId);
+      
+      // Component unmount olduğunda bağlantı noktasını kaldır
+      unregisterConnectionPoint(nodeId);
     };
-  }, [scale, parentPosition, calculateNodePosition]);
+  }, [scale, parentPosition, calculateNodePosition, cardId, nodeId, unregisterConnectionPoint]);
 
   // Determine node position style based on side
   const getNodeStyle = () => {
@@ -112,9 +129,10 @@ const ConnectionNode: React.FC<ConnectionNodeProps> = ({
           ? 'rgba(16, 185, 129, 0.6)' // Green for nodes with existing connections
           : 'rgba(59, 130, 246, 0.4)',
       border: '2px solid white',
-      zIndex: 10,
+      zIndex: 50,
       transition: 'transform 0.2s, background-color 0.2s',
       transform: (isHovering || isDropTarget) ? 'scale(1.2)' : 'scale(1)',
+      pointerEvents: 'auto',
     };
 
     switch (side) {
@@ -159,7 +177,7 @@ const ConnectionNode: React.FC<ConnectionNodeProps> = ({
     e.preventDefault(); // Prevent text selection
     calculateNodePosition(); // Update position right before connecting
     if (previewConnection && previewConnection.sourceCardId !== cardId) {
-      endConnection(cardId, nodePosition, side, nodeId);
+      const success = endConnection(cardId, nodePosition, side, nodeId);
     }
   };
 

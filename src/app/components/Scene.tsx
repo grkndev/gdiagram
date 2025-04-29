@@ -90,7 +90,9 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
               <Connections />
               
               {/* Scene children (draggable elements) */}
-              {children}
+              <div style={{ pointerEvents: 'auto' }}>
+                {children}
+              </div>
             </div>
           </div>
 

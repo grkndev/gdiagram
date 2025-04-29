@@ -44,6 +44,8 @@ export default function Home() {
           <div className="mt-2 text-muted-foreground">Connect me to other cards</div>
         </div>
       </DraggableCard>
+
+    
     </Scene>
   );
 }
