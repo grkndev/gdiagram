@@ -16,7 +16,7 @@ export const useZoom = ({
   const [scale, setScale] = useState(initialScale);
 
   const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
+    e.cancelable && e.preventDefault();
     const delta = e.deltaY;
     setScale(prevScale => {
       const newScale = delta > 0 
