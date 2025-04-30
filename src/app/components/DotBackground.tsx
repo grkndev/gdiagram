@@ -26,7 +26,11 @@ export const DotBackground: React.FC<DotBackgroundProps> = ({
         backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
         backgroundSize: `${dotSize * scale / 100}px ${dotSize * scale / 100}px`,
         backgroundPosition: 'center center',
-        transform: `translate(-50%, -50%) scale(${scale / 100})`,
+        transform: `translate(-50%, -50%)`,
+        transformStyle: 'preserve-3d',
+        pointerEvents: 'none',
+        zIndex: -1,
+        zoom: scale / 100,
         transformOrigin: 'center',
       }}
     />

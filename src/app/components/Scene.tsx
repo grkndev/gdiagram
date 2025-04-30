@@ -17,7 +17,7 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
   // Initialize zoom functionality
   const { scale, handleWheel, adjustScale } = useZoom();
   const sceneRef = useRef<HTMLDivElement>(null);
-  
+
   // Initialize scene dragging (with middle mouse button)
   const { position, elementRef, handlers } = useDrag<HTMLDivElement>({
     buttonIndex: 1, // Middle mouse button
@@ -31,7 +31,7 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
     if (e.button === 1) {
       handlers.onMouseDown(e);
     }
-    
+
     // Prevent text selection
     e.preventDefault();
   };
@@ -43,7 +43,7 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
   // Use effect to add selectstart event listener
   useEffect(() => {
     const sceneElement = sceneRef.current;
-    
+
     const handleSelectStart = (e: Event) => {
       e.preventDefault();
       return false;
@@ -63,12 +63,12 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
   return (
     <SceneProvider scale={scale}>
       <ConnectionProvider>
-        <div 
+        <div
           ref={sceneRef}
-          className="relative w-full h-screen overflow-hidden bg-secondary select-none" 
+          className="relative w-full h-screen overflow-hidden bg-secondary select-none"
         >
           {/* Scene container */}
-          <div 
+          <div
             ref={elementRef}
             className="w-full h-full select-none"
             onWheel={handleWheel}
@@ -77,18 +77,21 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
             onMouseUp={handlers.onMouseUp}
           >
             {/* Scene content */}
-            <div 
+            <div
               className="absolute top-1/2 left-1/2 w-full h-full transition-none select-none"
-              style={{ 
+              style={{
                 transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
+                zoom: scale/100,
+                transformStyle: 'preserve-3d',
+                transformOrigin: 'center',
               }}
             >
               {/* Dot pattern background */}
               <DotBackground scale={scale} />
-              
+
               {/* Connections between cards */}
               <Connections />
-              
+
               {/* Scene children (draggable elements) */}
               <div style={{ pointerEvents: 'auto' }}>
                 {children}
@@ -97,7 +100,7 @@ export const Scene: React.FC<SceneProps> = ({ children }) => {
           </div>
 
           {/* Zoom controls */}
-          <ZoomControls 
+          <ZoomControls
             scale={scale}
             onZoomIn={() => adjustScale(10)}
             onZoomOut={() => adjustScale(-10)}

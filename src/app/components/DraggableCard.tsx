@@ -142,7 +142,7 @@ export const DraggableCard: React.FC<DraggableCardProps> = ({
       style={{
         width: `${width}px`,
         height: `${height}px`,
-        transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px)) scale(${scale / 100})`,
+        transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
         transformOrigin: 'center',
         zIndex: 10,
         position: 'relative',
